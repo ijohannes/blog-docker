@@ -1,0 +1,87 @@
+version: "3.5"
+
+services:
+  app_nginx:
+    image: nginx:stable-alpine
+    container_name: app_nginx
+    expose:
+      - 8000
+    ports:
+      - 8000:80
+    volumes:
+      - ./:/var/www/html/
+      - ./docker-compose/nginx:/etc/nginx/conf.d/
+    depends_on:
+      - app_blog
+      - app_mariadb
+    restart: always
+    networks:
+      - app_network
+    
+  app_mariadb:
+    image: mysql
+    container_name: app_mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=blog
+      - MYSQL_DATABASE=blog
+      - MYSQL_USER=ngtriana
+      - MYSQL_PASSWORD=blog
+    volumes:
+      - dbdata:/var/lib/mysql/
+    expose:
+      - 3211
+    ports:
+      - 3211:3306
+    restart: always
+    networks:
+      - app_network
+
+  app_blog:
+    build:
+      args:
+        user: testusr
+        uid: 1000
+      context: .
+      dockerfile: ./dockerfile/Dockerfile
+    container_name: app_blog
+    restart: always
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html/
+    networks:
+      - app_network
+    
+  phpmyadmin_blog:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin_blog
+    expose:
+      - 8091
+    ports:
+      - 8091:80
+    environment:
+      - PMA_HOST=app_mariadb
+      - PMA_PORT=3306
+      - UPLOAD_LIMIT=200240000
+    links:
+      - app_mariadb
+    restart: always
+    networks:
+      - app_network
+
+  mailhog:
+    image: mailhog/mailhog
+    logging:
+      driver: "none"
+    ports:
+      - ${MAIL_PORT:-1025}:1025
+      - ${MAILHOG_PORT:-8025}:8025
+    networks:
+      - app_network
+
+networks:
+    app_network:
+        driver: bridge
+        name: app_network
+
+volumes:
+    dbdata:
